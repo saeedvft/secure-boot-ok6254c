@@ -1,0 +1,15 @@
+/dts-v1/;
+
+/ {
+    signature {
+        compatible = "u-boot,signature";
+        algo = "rsa";
+        hash = "sha256";
+        key-name-hint = "custMpk";
+        pubkey {
+            #address-cells = <1>;
+            #size-cells = <1>;
+            data = /incbin/("custMpk_pub.der");
+        };
+    };
+};

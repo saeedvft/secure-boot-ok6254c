@@ -1,0 +1,68 @@
+/dts-v1/;
+
+/ {
+	description = "Configuration to load ATF and SPL";
+	#address-cells = <1>;
+
+	images {
+		atf {
+			description = "ARM Trusted Firmware";
+			data = /incbin/("bl31.bin");
+			type = "firmware";
+			arch = "arm64";
+			compression = "none";
+			os = "arm-trusted-firmware";
+			load = <0x9e780000>;
+			entry = <0x9e780000>;
+		};
+		tee {
+			description = "OPTEE";
+			data = /incbin/("/dev/null");
+			type = "tee";
+			arch = "arm64";
+			compression = "none";
+			os = "tee";
+			load = <0x9e800000>;
+			entry = <0x9e800000>;
+		};
+		dm {
+			description = "DM binary";
+			data = /incbin/("/dev/null");
+			type = "firmware";
+			arch = "arm32";
+			compression = "none";
+			os = "DM";
+			load = <0x89000000>;
+			entry = <0x89000000>;
+		};
+		spl {
+			description = "SPL (64-bit)";
+			data = /incbin/("spl/u-boot-spl-nodtb.bin");
+			type = "standalone";
+			os = "U-Boot";
+			arch = "arm64";
+			compression = "none";
+			load = <0x80080000>;
+			entry = <0x80080000>;
+		};
+		ok6254c.dtb {
+			description = "ok6254c";
+			data = /incbin/("spl/dts/ok6254c.dtb");
+			type = "flat_dt";
+			arch = "arm";
+			compression = "none";
+		};
+
+	};
+
+	configurations {
+		default = "ok6254c.dtb";
+
+		ok6254c.dtb {
+			description = "ok6254c";
+			firmware = "atf";
+			loadables = "tee", "dm", "spl";
+			fdt = "ok6254c.dtb";
+		};
+	};
+};
