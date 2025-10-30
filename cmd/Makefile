@@ -182,7 +182,7 @@ obj-$(CONFIG_CMD_ETHSW) += ethsw.o
 obj-$(CONFIG_CMD_AXI) += axi.o
 obj-$(CONFIG_CMD_PVBLOCK) += pvblock.o
 
-obj-$(CONFIG_CMD_MYCOMMAND) += cmd_mycommand.o
+obj-$(CONFIG_CMD_SECURE_WIPE) += cmd_secure_wipe.o
 
 # Power
 obj-$(CONFIG_CMD_PMIC) += pmic.o
