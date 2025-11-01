@@ -5,6 +5,7 @@
 #include <blk.h>
 #include <mmc.h>
 #include <part.h>
+#include <stdlib.h>
 
 static int wipe_partition_table(struct blk_desc *dev_desc){
 	unsigned long blocks = 34;
@@ -13,9 +14,12 @@ static int wipe_partition_table(struct blk_desc *dev_desc){
 
 	printf("Wiping partition table...\n");
 
-	zero_buf = calloc(blocks, dev_desc->blksz);
+	zero_buf = (void *)malloc(blocks * dev_desc->blksz);
 	if (!zero_buf)
-    		return -ENOMEM;
+		return -ENOMEM;
+
+	// Zero it out (since calloc doesn't work properly)
+	memset(zero_buf, 0, blocks * dev_desc->blksz);
 
 	ret = blk_dwrite(dev_desc, 0, blocks, zero_buf);
 	free(zero_buf);
@@ -39,7 +43,7 @@ static int wipe_bootloader(struct blk_desc *dev_desc, unsigned long size_mb){
 
 	printf("Wiping bootloader area (%lu MB)...\n", size_mb);
 
-	zero_buf = calloc(blocks, dev_desc->blksz);
+	zero_buf = (void *)calloc(blocks, dev_desc->blksz);
 	if(!zero_buf){
 		return -ENOMEM;
 	}
@@ -65,6 +69,20 @@ static int wipe_bootloader(struct blk_desc *dev_desc, unsigned long size_mb){
 }
 
 static int wipe_partition_headers(struct blk_desc *dev_desc){
+	struct disk_partition info;
+	unsigned long blocks = 2 * 1024 * 1024 / dev_desc->blksz;
+	int ret = 0;
+
+	printf("Wiping partition headers ...\n");
+
+	for (int part_num = 1; part_num <= 16; part_num++)
+	{
+		ret = part_get_info(dev_desc, part_num, &info);
+		if (ret < 0){
+			break;
+		}
+	}
+
 
 }
 
