@@ -9,7 +9,7 @@
 static int wipe_partition_table(struct blk_desc *dev_desc){
 	unsigned long blocks = 34;
 	void *zero_buf;
-	int ret;
+	int ret = 0;
 
 	printf("Wiping partition table...\n");
 
@@ -33,7 +33,7 @@ static int wipe_bootloader(struct blk_desc *dev_desc, unsigned long size_mb){
 	unsigned long blocks = 1024 * 1024 * size_mb / dev_desc->blksz;
 	unsigned long chunck = 2048/*blocks*/;
 	void *zero_buf;
-	int ret;
+	int ret = 0;
 	int written = 0;
 	int to_write = 0;
 
@@ -70,10 +70,11 @@ static int wipe_partition_headers(struct blk_desc *dev_desc){
 
 int secure_wipe_disk(int device, int level){
 	struct blk_desc *dev_desc;
+	int ret = 0;
 
 	printf("\n=================\n");
 	printf("WIPING DISK!\n");
-	printf("\n=================\n");
+	printf("=================\n");
 
 	dev_desc = blk_get_devnum_by_type(IF_TYPE_MMC, device);
 	if (!dev_desc) {
@@ -86,7 +87,7 @@ int secure_wipe_disk(int device, int level){
 
 	switch(level){
 		case(1):
-			// wipe_partition_table;
+			ret = wipe_partition_table(dev_desc);
 		case(2):
 			// wipe_partition_table;
 			// wipe_bootloader - 8;
@@ -95,10 +96,15 @@ int secure_wipe_disk(int device, int level){
 			// wipe_bootloader - 100;
 			// wipe_partition_headers;
 		default:
-			printf("Invalid Wipe level!");
+			printf("Invalid Wipe level!\n");
 	}
 
-	return 0;
+	if (ret == 0)
+		printf("\n=== WIPE COMPLETED ===\n\n");
+	else
+		printf("\n=== WIPE FAILED ===\n\n");
+
+	return ret;
 }
 
 static int do_secure_wipe(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
