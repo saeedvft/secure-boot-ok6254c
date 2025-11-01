@@ -101,6 +101,8 @@ static int wipe_partition_headers(struct blk_desc *dev_desc){
 			break;
 		}
 
+		DBG("  Part %d (%s) at LBA %lu\n", part_num, info.name, (unsigned long)info.start);
+
 		unsigned long to_write = 0;
 		if(header_blocks < info.size){
 			to_write = header_blocks;
@@ -144,13 +146,14 @@ int secure_wipe_disk(int device, int level){
 			ret = wipe_partition_table(dev_desc);
 			break;
 		case(2):
-			// wipe_partition_table;
-			// wipe_bootloader - 8;
-			// wipe_partition_headers'
+			// ret = wipe_partition_table(dev_desc);
+			// ret = wipe_bootloader(dev_desc, 8);
+			ret = wipe_partition_headers(dev_desc);
 			break;
 		case(3):
-			// wipe_bootloader - 100;
-			// wipe_partition_headers;
+			ret = wipe_partition_table(dev_desc);
+			// ret = wipe_bootloader(dev_desc, 100);
+			ret = wipe_partition_headers(dev_desc);
 			break;
 		default:
 			DBG("%s", "Invalid Wipe level!\n");
