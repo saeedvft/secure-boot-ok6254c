@@ -1,4 +1,4 @@
-// cmd/cmd_mycommand.c
+// cmd/cmd_secure_wipe.c
 #include <common.h>
 #include <command.h>
 #include <linux/delay.h>
@@ -7,12 +7,22 @@
 #include <part.h>
 #include <stdlib.h>
 
+bool debug_mode = true;
+
+// Macro that checks debug_mode at runtime
+#define DBG(fmt, ...) \
+    do { \
+        if (debug_mode) { \
+            fprintf(stderr, fmt, ##__VA_ARGS__); \
+        } \
+    } while (0)
+
 static int wipe_partition_table(struct blk_desc *dev_desc){
 	unsigned long blocks = 34;
 	void *zero_buf;
 	int ret = 0;
 
-	printf("Wiping partition table...\n");
+	DBG("%s", "Wiping partition table...\n");
 
 	zero_buf = (void *)malloc(blocks * dev_desc->blksz);
 	if (!zero_buf)
@@ -25,11 +35,11 @@ static int wipe_partition_table(struct blk_desc *dev_desc){
 	free(zero_buf);
 
 	if (ret != blocks) {
-		printf("Error: Failed to wipe partition table\n");
+		DBG("%s", "Error: Failed to wipe partition table\n");
 		return -EIO;
 	}
 
-	printf("Partition table wiped\n");
+	DBG("%s", "Partition table wiped\n");
 	return 0;
 }
 
@@ -41,7 +51,7 @@ static int wipe_bootloader(struct blk_desc *dev_desc, unsigned long size_mb){
 	int written = 0;
 	int to_write = 0;
 
-	printf("Wiping bootloader area (%lu MB)...\n", size_mb);
+	DBG("%s%lu%s", "Wiping bootloader area (", size_mb, " MB)...\n");
 
 	zero_buf = (void *)malloc(blocks * dev_desc->blksz);
 	if (!zero_buf)
@@ -67,7 +77,7 @@ static int wipe_bootloader(struct blk_desc *dev_desc, unsigned long size_mb){
 
 	free(zero_buf);
 
-	printf("Bootloader wiped\n");
+	DBG("%s", "Bootloader wiped\n");
 }
 
 static int wipe_partition_headers(struct blk_desc *dev_desc){
@@ -77,7 +87,7 @@ static int wipe_partition_headers(struct blk_desc *dev_desc){
 	void * zero_buf;
 	int ret = 0;
 
-	printf("Wiping partition headers ...\n");
+	DBG("%s", "Wiping partition headers ...\n");
 
 	zero_buf = (void *)malloc(header_bytes);
 	if(!zero_buf){
@@ -108,44 +118,49 @@ static int wipe_partition_headers(struct blk_desc *dev_desc){
 	}
 	free(zero_buf);
 
-	printf("partition headers wiped.\n");
+	DBG("%s", "partition headers wiped.\n");
 }
 
 int secure_wipe_disk(int device, int level){
 	struct blk_desc *dev_desc;
-	int ret = 0;
+	int ret = -1;
 
-	printf("\n=================\n");
-	printf("WIPING DISK!\n");
-	printf("=================\n");
+	DBG("%s", "Program started\n");
+	DBG("%s", "\n=================\n");
+	DBG("%s", "WIPING DISK!\n");
+	DBG("%s", "=================\n");
 
 	dev_desc = blk_get_devnum_by_type(IF_TYPE_MMC, device);
 	if (!dev_desc) {
-		printf("Error: Cannot get MMC device %d\n", device);
+		DBG("%s%d%s", "Error: Cannot get MMC device ", device, "\n");
 		return -ENODEV;
 
 	}
-	printf("Device: MMC %d\n", device);
-	printf("Wipe level: %d\n\n", level);
+	DBG("%s%d\n", "Device: MMC ", device);
+	DBG("%s%d\n\n", "Wipe level: ", level);
 
 	switch(level){
 		case(1):
 			ret = wipe_partition_table(dev_desc);
+			break;
 		case(2):
 			// wipe_partition_table;
 			// wipe_bootloader - 8;
 			// wipe_partition_headers'
+			break;
 		case(3):
 			// wipe_bootloader - 100;
 			// wipe_partition_headers;
+			break;
 		default:
-			printf("Invalid Wipe level!\n");
+			DBG("%s", "Invalid Wipe level!\n");
+			break;
 	}
 
 	if (ret == 0)
-		printf("\n=== WIPE COMPLETED ===\n\n");
+		DBG("%s", "\n=== WIPE COMPLETED ===\n\n");
 	else
-		printf("\n=== WIPE FAILED ===\n\n");
+		DBG("%s", "\n=== WIPE FAILED ===\n\n");
 
 	return ret;
 }
