@@ -43,10 +43,12 @@ static int wipe_bootloader(struct blk_desc *dev_desc, unsigned long size_mb){
 
 	printf("Wiping bootloader area (%lu MB)...\n", size_mb);
 
-	zero_buf = (void *)calloc(blocks, dev_desc->blksz);
-	if(!zero_buf){
+	zero_buf = (void *)malloc(blocks * dev_desc->blksz);
+	if (!zero_buf)
 		return -ENOMEM;
-	}
+
+	// Zero it out (since calloc doesn't work properly)
+	memset(zero_buf, 0, blocks * dev_desc->blksz);
 
 	while(written < blocks){
 		if (blocks -  written < chunck){
@@ -70,10 +72,17 @@ static int wipe_bootloader(struct blk_desc *dev_desc, unsigned long size_mb){
 
 static int wipe_partition_headers(struct blk_desc *dev_desc){
 	struct disk_partition info;
-	unsigned long blocks = 2 * 1024 * 1024 / dev_desc->blksz;
+	unsigned long header_bytes = 2 * 1024 * 1024;
+	unsigned long header_blocks = header_bytes / dev_desc->blksz;
+	void * zero_buf;
 	int ret = 0;
 
 	printf("Wiping partition headers ...\n");
+
+	zero_buf = (void *)malloc(header_bytes);
+	if(!zero_buf){
+		return -ENOMEM;
+	}
 
 	for (int part_num = 1; part_num <= 16; part_num++)
 	{
@@ -81,9 +90,25 @@ static int wipe_partition_headers(struct blk_desc *dev_desc){
 		if (ret < 0){
 			break;
 		}
+
+		unsigned long to_write = 0;
+		if(header_blocks < info.size){
+			to_write = header_blocks;
+		}
+		else{
+			to_write = info.size;
+		}
+
+		ret = blk_dwrite(dev_desc, info.start, to_write, zero_buf);
+		if (ret != to_write) {
+			free(zero_buf);
+			return -EIO;
+		}
+
 	}
+	free(zero_buf);
 
-
+	printf("partition headers wiped.\n");
 }
 
 int secure_wipe_disk(int device, int level){
