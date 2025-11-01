@@ -78,6 +78,7 @@ static int wipe_bootloader(struct blk_desc *dev_desc, unsigned long size_mb){
 	free(zero_buf);
 
 	DBG("%s", "Bootloader wiped\n");
+	return 0;
 }
 
 static int wipe_partition_headers(struct blk_desc *dev_desc){
@@ -93,6 +94,8 @@ static int wipe_partition_headers(struct blk_desc *dev_desc){
 	if(!zero_buf){
 		return -ENOMEM;
 	}
+
+	memset(zero_buf, 0, header_blocks * dev_desc->blksz);
 
 	for (int part_num = 1; part_num <= 16; part_num++)
 	{
@@ -121,6 +124,51 @@ static int wipe_partition_headers(struct blk_desc *dev_desc){
 	free(zero_buf);
 
 	DBG("%s", "partition headers wiped.\n");
+	return 0;
+}
+
+static int wipe_partitions(struct blk_desc *dev_desc){
+	struct disk_partition info;
+	unsigned long chunck = 2048/*blocks*/;
+	void * zero_buf;
+	int ret = 0;
+
+	DBG("%s", "Wiping partitions ...\n");
+
+	for (int part_num = 1; part_num <= 16; part_num++)
+	{
+		ret = part_get_info(dev_desc, part_num, &info);
+		if (ret < 0){
+			break;
+		}
+
+		zero_buf = (void *)malloc(info.size * dev_desc->blksz);
+		if(!zero_buf){
+			return -ENOMEM;
+		}
+
+		memset(zero_buf, 0, info.size * dev_desc->blksz);
+
+		DBG("  Part %d (%s) at LBA %lu\n", part_num, info.name, (unsigned long)info.start);
+
+		unsigned long written = info.start/*blocks*/;
+
+		unsigned long chunk_num = 0;
+		while(written < info.start + info.size){
+			ret = blk_dwrite(dev_desc, written, chunck, zero_buf);
+			if (ret != chunck) {
+				free(zero_buf);
+				return -EIO;
+			}
+			DBG("  Chunk[%lu] wiped!\n", chunk_num);
+			written += chunck;
+			chunk_num++;
+		}
+	}
+	free(zero_buf);
+
+	DBG("%s", "partitions wiped.\n");
+	return 0;
 }
 
 int secure_wipe_disk(int device, int level){
@@ -151,9 +199,9 @@ int secure_wipe_disk(int device, int level){
 			ret = wipe_partition_headers(dev_desc);
 			break;
 		case(3):
-			ret = wipe_partition_table(dev_desc);
+			// ret = wipe_partition_table(dev_desc);
 			// ret = wipe_bootloader(dev_desc, 100);
-			ret = wipe_partition_headers(dev_desc);
+			ret = wipe_partitions(dev_desc);
 			break;
 		default:
 			DBG("%s", "Invalid Wipe level!\n");
