@@ -127,48 +127,54 @@ static int wipe_partition_headers(struct blk_desc *dev_desc){
 	return 0;
 }
 
-static int wipe_partitions(struct blk_desc *dev_desc){
-	struct disk_partition info;
-	unsigned long chunck = 2048/*blocks*/;
-	void * zero_buf;
-	int ret = 0;
+static int wipe_partitions(struct blk_desc *dev_desc)
+{
+    struct disk_partition info;
+    unsigned long chunk_blocks = 2048;  // 1MB chunks
+    void *zero_buf;
+    int ret;
 
-	DBG("%s", "Wiping partitions ...\n");
+    DBG("%s", "Wiping partitions...\n");
 
-	for (int part_num = 1; part_num <= 16; part_num++)
-	{
-		ret = part_get_info(dev_desc, part_num, &info);
-		if (ret < 0){
-			break;
-		}
+    zero_buf = malloc(chunk_blocks * dev_desc->blksz);
+    if (!zero_buf)
+        return -ENOMEM;
+    memset(zero_buf, 0, chunk_blocks * dev_desc->blksz);
 
-		zero_buf = (void *)malloc(info.size * dev_desc->blksz);
-		if(!zero_buf){
-			return -ENOMEM;
-		}
+    for (int part_num = 1; part_num <= 16; part_num++) {
+        ret = part_get_info(dev_desc, part_num, &info);
+        if (ret < 0)
+            break;
 
-		memset(zero_buf, 0, info.size * dev_desc->blksz);
+        DBG("  Part %d (%s) at LBA %lu, size %lu\n",
+            part_num, info.name, (unsigned long)info.start, (unsigned long)info.size);
 
-		DBG("  Part %d (%s) at LBA %lu\n", part_num, info.name, (unsigned long)info.start);
+        unsigned long written = 0;
+        unsigned long total_blocks = info.size;
 
-		unsigned long written = info.start/*blocks*/;
+        while (written < total_blocks) {
+            unsigned long to_write = (total_blocks - written) < chunk_blocks ?
+                                     (total_blocks - written) : chunk_blocks;
 
-		unsigned long chunk_num = 0;
-		while(written < info.start + info.size){
-			ret = blk_dwrite(dev_desc, written, chunck, zero_buf);
-			if (ret != chunck) {
-				free(zero_buf);
-				return -EIO;
-			}
-			DBG("  Chunk[%lu] wiped!\n", chunk_num);
-			written += chunck;
-			chunk_num++;
-		}
-	}
-	free(zero_buf);
+            ret = blk_dwrite(dev_desc, info.start + written, to_write, zero_buf);
+            if (ret != to_write) {
+                DBG("  ERROR: Write failed at block %lu\n", written);
+                free(zero_buf);
+                return -EIO;
+            }
 
-	DBG("%s", "partitions wiped.\n");
-	return 0;
+            written += to_write;
+            DBG("  Progress: %lu/%lu MB\n",
+                (written * dev_desc->blksz) / (1024 * 1024),
+                (total_blocks * dev_desc->blksz) / (1024 * 1024));
+        }
+
+        DBG("  Part %d wiped completely\n", part_num);
+    }
+
+    free(zero_buf);
+    DBG("%s", "All partitions wiped.\n");
+    return 0;
 }
 
 int secure_wipe_disk(int device, int level){
