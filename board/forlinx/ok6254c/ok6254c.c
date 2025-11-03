@@ -173,6 +173,9 @@ void mmr_unlock(phys_addr_t base, u32 partition);
 
 int board_late_init(void)
 {
+	env_set("bootcmd", "echo === Secure Boot Starting ===; "
+                   "if fatload mmc 1:1 0x88000000 boot.scr; then source 0x88000000; else echo FATAL: Boot script missing; fi");
+	env_save();
 	#if 0
 	if (IS_ENABLED(CONFIG_TI_I2C_BOARD_DETECT)) {
 		struct ti_am6_eeprom *ep = TI_AM6_EEPROM_DATA;
