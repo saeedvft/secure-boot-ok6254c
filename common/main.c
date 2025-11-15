@@ -39,7 +39,7 @@ static void run_preboot_environment_command(void)
 void main_loop(void)
 {
 	const char *s;
-	const unsigned long expected_size = 3164; // boot.scr known good size in bytes
+	const unsigned long expected_size = 3654; // boot.scr known good size in bytes
 	char *filesize_env;
 	unsigned long actual_size;
 
