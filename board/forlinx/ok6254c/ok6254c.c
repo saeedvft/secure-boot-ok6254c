@@ -16,6 +16,10 @@
 #include <asm/arch/hardware.h>
 #include <asm/arch/sys_proto.h>
 #include <env.h>
+#include <command.h>
+#include <image.h>
+#include <mapmem.h>
+#include <linux/errno.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -173,8 +177,56 @@ void mmr_unlock(phys_addr_t base, u32 partition);
 
 int board_late_init(void)
 {
-	env_set("bootcmd", "echo === Secure Boot Starting ===; "
-                   "if fatload mmc 1:1 0x88000000 boot.scr; then source 0x88000000; else echo FATAL: Boot script missing; fi");
+	/* Develop mode flag - set to 1 to enable debug logs, 0 for production */
+	const int develop_mode = 0;
+
+	/* Debug macro */
+	#define DBG(fmt, ...) \
+		do { \
+			if (develop_mode) { \
+				printf(fmt, ##__VA_ARGS__); \
+			} \
+		} while (0)
+
+	unsigned long scriptaddr = 0x88000000;
+	unsigned char calculated_hash[32];  // SHA256 = 32 bytes
+	unsigned char expected_hash[32] = {
+		0xa0, 0x8f, 0xb5, 0x1c, 0xa2, 0xd6, 0x68, 0xda, 0x6a, 0xe1, 0x70, 0xa8,
+		0xfc, 0x9c, 0x09, 0x12, 0x31, 0x39, 0x15, 0x98, 0x1f, 0x52, 0x90, 0xc3,
+		0xd5, 0x59, 0x4c, 0x35, 0xac, 0xec, 0x78, 0xcf
+	};
+	int ret;
+
+	ret = run_command("load mmc 1:1 0x88000000 boot.scr", 0);
+	if (ret != 0) {
+		printf("Failed to load boot.scr\n");
+		hang();
+	}
+
+	// Get file size from last load operation
+	unsigned long filesize = env_get_ulong("filesize", 16, 0);
+
+	// Calculate SHA256
+	sha256_csum_wd((unsigned char *)scriptaddr, filesize,
+			calculated_hash, CHUNKSZ_SHA256);
+
+	if (memcmp(calculated_hash, expected_hash, 32) != 0) {
+		DBG("SHA256 MISMATCH - boot.scr tampered!\n");
+		DBG("Expected: ");
+		for (int i = 0; i < 32; i++) DBG("%02x", expected_hash[i]);
+		DBG("\nGot:      ");
+		for (int i = 0; i < 32; i++) DBG("%02x", calculated_hash[i]);
+		DBG("\n");
+		// run_command("secure_wipe 1 2", 0);
+		// run_command("secure_wipe 1 1", 0);
+		printf("System halted. Power cycle required.\n");
+		hang();
+	}
+
+	DBG("Boot script verification passed\n");
+
+	env_set("bootcmd", "if fatload mmc 1:1 0x88000000 boot.scr; then source 0x88000000; else echo FATAL: Boot script missing; fi");
+	env_set("bootdelay", "-2");
 	env_save();
 	#if 0
 	if (IS_ENABLED(CONFIG_TI_I2C_BOARD_DETECT)) {
@@ -195,6 +247,8 @@ int board_late_init(void)
 	/* OLDI -- power on */
 	mmr_unlock(CTRL_MMR0_BASE, 2);
 	writel(0x00ul, CTRL_MMR0_OLDI_PD_CTRL);
+
+	env_set("silent", "1");
 	return 0;
 }
 #endif
